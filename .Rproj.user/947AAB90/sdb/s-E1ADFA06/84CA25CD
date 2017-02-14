@@ -1,0 +1,20 @@
+{
+    "collab_server" : "",
+    "contents" : "rm(list = ls())\n\n# install.packages(\"zoo\")\n# install.packages(\"RColorBrewer\")\n# install.packages(\"gglasso\")\n\n# library(gglasso)\n# library(RColorBrewer)\n# library(zoo)\n\nhist=read.csv(\"historical_data.csv\")\nproj=read.csv(\"projections.csv\")\n\nhist=data.frame(Date=as.Date(as.yearqtr(hist[,1])),hist[,-1])\nproj=data.frame(Date=proj[,1],proj[,-1])\n\nplot(y=hist$Unemployment.Rate,x=hist$Date,main=\"Unemployment\",lwd=2,col=\"slateblue\",type=\"l\",\n     xlab=\"Time\",ylab=\"Unemployment %\")\ngrid()\n\n#Remove Dates and Unemployment from the model matrix \nX=hist[,c(-1,-4)]\nX=as.matrix(X)\nY=hist[,4]\ngrp=c(1,1,1,2,2,2,2,3,3,3,3,4,4)\nfit=gglasso(x=X,y=Y,group=grp,loss='ls')\ncoef.mat=fit$beta\n\n#Group1 enters the equation\ng1=max(which(coef.mat[1,]==0))\n\n#Group2 enters the equation\ng2=max(which(coef.mat[4,]==0))\n\n#Group3 enters the equation\ng3=max(which(coef.mat[8,]==0))\n\n#Group4 enters the equation\ng4=max(which(coef.mat[12,]==0))\n\n#Coefficient Plot. Let's also use some nice colors\n\ncols=brewer.pal(5,name=\"Set1\")\n\nplot(fit$b0,main=\"Coefficient vs Step\",\n     ylab=\"Intercept\",xlab=\"Step (decreasing Lambda =>)\",\n     col=cols[1],\n     xlim=c(-1,100),\n     ylim=c(5,max(fit$b0)),\n     type=\"l\",lwd=4)\ngrid()\npar(new=T)\n\nx=c(g1,g2,g3,g4)\ny=c(fit$b0[g1],fit$b0[g2],fit$b0[g3],fit$b0[g4])\n\nplot(x=x,y=y,pch=13,lwd=2,cex=2,col=cols[-1],\n     xlim=c(-1,100),ylim=c(5,max(fit$b0)),\n     xaxt='n',yaxt='n',xlab=\"\",ylab=\"\")\n\nlmda=round(fit$lambda[c(g1,g2,g3,g4)],2)\ntext(x=x-0.5,y=y+0.1,labels=c(\"Group1\",\"Group2\",\"Group3\",\"Group4\"),pos=3,cex=0.9)\ntext(x=x-0.5,y=y-0.1,labels=paste(\"Lambda\\n=\",lmda),pos=1,cex=0.8)",
+    "created" : 1487015810585.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "264027769",
+    "id" : "84CA25CD",
+    "lastKnownWriteTime" : 1487052805,
+    "last_content_update" : 1487052805,
+    "path" : "~/Documents/group_lasso/glasso.R",
+    "project_path" : "glasso.R",
+    "properties" : {
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

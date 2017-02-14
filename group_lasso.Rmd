@@ -1,0 +1,115 @@
+---
+title: "Group_Lasso"
+author: "Kevin Vo"
+date: "2/13/2017"
+output: html_document
+---
+# Group Lasso Tutorial
+*Note: This tutorial is based off of royr2. I'm using the example and appending my own notes for the sake of my understanding*
+
+## Preprocessing
+
+We first load install the necessary libraries and load them in. We also load in the csv files and format the dates.
+```{r results='hide', message=FALSE, warning=FALSE}
+library(gglasso)
+library(RColorBrewer)
+library(zoo)
+
+hist=read.csv("historical_data.csv")
+proj=read.csv("projections.csv")
+
+hist=data.frame(Date=as.Date(as.yearqtr(hist[,1])),hist[,-1])
+proj=data.frame(Date=proj[,1],proj[,-1])
+```
+
+We now make a plot of unemployment rate over time.
+```{r makeplot}
+plot(y=hist$Unemployment.Rate,x=hist$Date,main="Unemployment",lwd=2,col="slateblue",type="l",xlab="Time",ylab="Unemployment %")
+grid()
+```
+
+The data makes sense so far. We expect to see high unemployment during the recession years and a recovery in the following years. Let's take a look at the column names of the hist data frame.
+```{r names}
+names(hist)
+```
+
+We now clean the data a bit. We remove Dates and Unemployment from the model matrix. Here we also define the groups, with the grp vector. Group 1 will be the first three variables. Group 2 will be the next four variables and so fourth. 
+```{r cleandata}
+X=hist[,c(-1,-4)]
+X=as.matrix(X)
+Y=hist[,4]
+grp=c(1,1,1,2,2,2,2,3,3,3,3,4,4)
+fit=gglasso(x=X,y=Y,group=grp,loss='ls')
+coef.mat=fit$beta
+```
+
+Now we identify when the groups enter the model.
+```{r identify}
+#Group1 enters the equation
+g1=max(which(coef.mat[1,]==0))
+
+#Group2 enters the equation
+g2=max(which(coef.mat[4,]==0))
+
+#Group3 enters the equation
+g3=max(which(coef.mat[8,]==0))
+
+#Group4 enters the equation
+g4=max(which(coef.mat[12,]==0))
+
+#Coefficient Plot. Let's also use some nice colors
+
+cols=brewer.pal(5,name="Set1")
+
+plot(fit$b0,main="Coefficient vs Step",
+     ylab="Intercept",xlab="Step (decreasing Lambda =>)",
+     col=cols[1],
+     xlim=c(-1,100),
+     ylim=c(5,max(fit$b0)),
+     type="l",lwd=4)
+grid()
+par(new=T)
+
+x=c(g1,g2,g3,g4)
+y=c(fit$b0[g1],fit$b0[g2],fit$b0[g3],fit$b0[g4])
+
+plot(x=x,y=y,pch=13,lwd=2,cex=2,col=cols[-1],
+     xlim=c(-1,100),ylim=c(5,max(fit$b0)),
+     xaxt='n',yaxt='n',xlab="",ylab="")
+
+lmda=round(fit$lambda[c(g1,g2,g3,g4)],2)
+text(x=x-0.5,y=y+0.1,labels=c("Group1","Group2","Group3","Group4"),pos=3,cex=0.9)
+text(x=x-0.5,y=y-0.1,labels=paste("Lambda\n=",lmda),pos=1,cex=0.8)
+```
+
+O.K. here's the question on the blocks. In a group lasso setting, can variables within a group be zero and nonzero for a given lambda. According to Michael Lim's Stanford Dissertation he states that "if an estimate $\beta_i$ is nonzero, where $i$ denotes group $i$, then all its components are usually nonzero". We see this here in "coef.mat".
+```{r viewcoeff}
+coef.mat[, 11:16]
+```
+Looking at coef.mat, we see that group 4 stays in the whole the time. Group 3 enters in s13. Group 2 subsequently enters in s15. There are no cases where only a select set of variables from a group enter or exit. They enter and exit as a *group*.
+
+## Group Lasso vs. Lasso
+
+The lasso uses an L1-norm penalty. The L1-norm penalty is defined as
+$$
+S = \sum_{i=1}^n |y_i - f(x_i)|
+$$
+Compare this to the L2-norm penalty. This is probably a loss function that many of you are familiar with. It is defined as follows.
+$$
+S = \sum_{i=1}^n (y_i - f(x_i))^2
+$$
+If you substitute the loss function with L2-norm in lasso you get ridge regression. The grouped lasso minimizes the following convex criterion. Here we have $L$ groups of variables. The feature matrix for group $i$ is denoted by $\textbf{X}$. Let $y$ be the vector of observations. $\beta_j$ for $j = 1, ..., p$. The parameter $\lambda$ controls the amount of regularization, with larger values implying more regularization. When $\lambda$ is large enough, all the coefficients will be estimated as zero. The $\gamma$ allows each group to be penalized to different extents, which allows us to penalize some groups more (or less) than others. Please note that the L2 penalty is not squared.
+$$
+\min_{\beta \in R^p}\frac{1}{2}\big(||y - \beta_0\textbf{1} - \sum_{l= 1}^L\textbf{X}_l\beta_l||_2^2 + \lambda\sum_{l = 1}^L \gamma_l ||\beta_l||_2 \big)
+$$
+Note: Group lasso does not monotonically decrease groups to zero. Groups and enter and exit the model.
+
+Sources
+
+1. http://www.chioka.in/differences-between-l1-and-l2-as-loss-function-and-regularization/
+
+2. http://web.stanford.edu/~hastie/THESES/Michael_Lim.pdf
+
+3. http://royr2.github.io/2014/04/15/GroupLasso.html
+
+4. http://statweb.stanford.edu/~tibs/stat315a/LECTURES/morelasso.pdf
